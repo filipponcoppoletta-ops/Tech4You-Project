@@ -332,8 +332,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     };
 
     const addKanbanTask = async (task: Omit<KanbanTask, 'id'>) => {
-        // We do not provide 'id' so Supabase can generate it (uuid or otherwise)
+        const id = `kanban-${Date.now()}`;
         const payload: Record<string, unknown> = {
+            id,
             phase_id: task.phaseId,
             title: task.title,
             status: task.status,
@@ -342,13 +343,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (task.startDate) payload.start_date = task.startDate;
         if (task.endDate) payload.end_date = task.endDate;
 
-        // Perform insert and select the inserted row to get its real ID
-        const { data, error } = await supabase.from('kanban_tasks').insert(payload).select().single();
-        if (!error && data) {
-            setKanbanTasks(prev => [...prev, { ...task, id: data.id }]);
+        // Perform insert
+        const { error } = await supabase.from('kanban_tasks').insert(payload);
+        if (!error) {
+            setKanbanTasks(prev => [...prev, { ...task, id }]);
         } else {
             console.error("Error creating Kanban task:", error);
-            // Fallback for UI if db fails (but ideally should throw or handle properly)
+            // Fallback for UI if db fails
             throw error;
         }
     };
