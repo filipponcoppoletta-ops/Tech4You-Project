@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, Zap, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Zap, LogOut, FileText, ListTodo } from "lucide-react";
 import { useProject } from "@/lib/ProjectContext";
 
 export function Sidebar() {
@@ -34,6 +34,14 @@ export function Sidebar() {
                 <Link href="/resources" className={`flex items-center gap-3 px-4 py-2.5 rounded-md font-medium transition-colors ${pathname === '/resources' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
                     <Users className="h-4 w-4" />
                     RACI & Resources
+                </Link>
+                <Link href="/documents" className={`flex items-center gap-3 px-4 py-2.5 rounded-md font-medium transition-colors ${pathname === '/documents' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                    <FileText className="h-4 w-4" />
+                    Documents
+                </Link>
+                <Link href="/checklists" className={`flex items-center gap-3 px-4 py-2.5 rounded-md font-medium transition-colors ${pathname === '/checklists' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                    <ListTodo className="h-4 w-4" />
+                    Checklists
                 </Link>
             </nav>
             {user && (

@@ -5,14 +5,17 @@ import { RaciTask, Resource, RaciRoleType } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Button } from "./ui/button";
-import { Plus, Trash2, Edit2 } from "lucide-react";
+import { Plus, Trash2, Edit2, Maximize2, Minimize2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogTrigger } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useState, useRef, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 export function RaciMatrix() {
     const { raciMatrix, resources, updateRaciTaskRole, addResource, deleteResource, addRaciTask, updateRaciTask, deleteRaciTask } = useProject();
+
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const [isAddResourceOpen, setIsAddResourceOpen] = useState(false);
     const [newResourceData, setNewResourceData] = useState<Partial<Resource>>({ name: "", role: "", email: "" });
@@ -80,11 +83,16 @@ export function RaciMatrix() {
         setEditingTaskId(null);
     };
 
-    return (
-        <Card className="shadow-sm border-border/60">
+    const raciContent = (
+        <Card className={cn("shadow-sm border-border/60 flex flex-col h-full", isExpanded && "border-none shadow-none rounded-none")}>
             <CardHeader className="pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                    <CardTitle className="text-xl">RACI Matrix</CardTitle>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                        RACI Matrix
+                        <Button variant="ghost" size="icon" onClick={() => setIsExpanded(!isExpanded)} className="h-8 w-8 ml-2 text-muted-foreground hover:text-foreground">
+                            {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                        </Button>
+                    </CardTitle>
                     <CardDescription>Resource allocation grid. Click cells to cycle roles.</CardDescription>
                 </div>
 
@@ -154,8 +162,8 @@ export function RaciMatrix() {
                 </div>
             </CardHeader>
 
-            <CardContent className="overflow-x-auto">
-                <div className="rounded-xl border border-border/50 overflow-hidden min-w-full inline-block">
+            <CardContent className="overflow-x-auto flex-1 flex flex-col">
+                <div className="rounded-xl border border-border/50 overflow-hidden min-w-full inline-block flex-1">
                     <Table className="w-full">
                         <TableHeader className="bg-muted/40 whitespace-nowrap">
                             <TableRow className="hover:bg-transparent">
@@ -238,7 +246,7 @@ export function RaciMatrix() {
                         </TableBody>
                     </Table>
                 </div>
-                <div className="mt-5 flex flex-wrap gap-4 text-xs font-medium justify-center sm:justify-end text-muted-foreground p-3 bg-muted/30 rounded-lg">
+                <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium justify-center sm:justify-end text-muted-foreground p-3 bg-muted/30 rounded-lg">
                     <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-sm flex items-center justify-center font-bold bg-blue-100 text-blue-800 border border-blue-200">R</div> Responsible</div>
                     <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-sm flex items-center justify-center font-bold bg-red-100 text-red-800 border border-red-200">A</div> Accountable</div>
                     <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-sm flex items-center justify-center font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">C</div> Consulted</div>
@@ -246,5 +254,29 @@ export function RaciMatrix() {
                 </div>
             </CardContent>
         </Card>
+    );
+
+    if (isExpanded) {
+        return (
+            <>
+                <Card className="flex flex-col h-full border-border/60 shadow-sm opacity-50">
+                    <CardContent className="flex items-center justify-center h-full min-h-[400px]">
+                        <Button variant="outline" onClick={() => setIsExpanded(false)}>RACI Matrix is Expanded</Button>
+                    </CardContent>
+                </Card>
+                <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+                    <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 flex flex-col overflow-hidden [&>button]:hidden">
+                        <DialogTitle className="sr-only">Expanded RACI Matrix</DialogTitle>
+                        {raciContent}
+                    </DialogContent>
+                </Dialog>
+            </>
+        );
+    }
+
+    return (
+        <>
+            {raciContent}
+        </>
     );
 }

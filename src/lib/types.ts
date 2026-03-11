@@ -5,6 +5,20 @@ export interface ProjectInfo {
   status: 'In Progress' | 'Completed' | 'Pending';
 }
 
+export interface ProjectFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  uploadDate: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 export interface Phase {
   id: string;
   name: string;
@@ -47,4 +61,6 @@ export interface KanbanTask {
   title: string;
   status: KanbanTaskStatus;
   assigneeId?: string;
+  startDate?: string;
+  endDate?: string;
 }

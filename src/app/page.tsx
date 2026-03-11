@@ -1,7 +1,7 @@
 import { TimelineSummary } from "@/components/TimelineSummary";
 import { PhasesList } from "@/components/PhasesList";
 import { Calendar } from "@/components/Calendar";
-
+import { RemindersWidget } from "@/components/RemindersWidget";
 
 export default function Dashboard() {
   return (
@@ -35,13 +35,19 @@ export default function Dashboard() {
 
         {/* Right Column: Calendar */}
         <div className="lg:col-span-1">
-          <section className="h-full">
-            <h2 className="text-xl font-semibold mb-4 tracking-tight flex items-center gap-2">
-              <span className="w-1.5 h-6 bg-primary rounded-full inline-block"></span>
-              Schedule
-            </h2>
-            <div className="sticky top-10">
-              <Calendar />
+          <section className="h-full space-y-8">
+            <div>
+              <h2 className="text-xl font-semibold mb-4 tracking-tight flex items-center gap-2">
+                <span className="w-1.5 h-6 bg-primary rounded-full inline-block"></span>
+                Schedule
+              </h2>
+              <div className="sticky top-10">
+                <Calendar />
+              </div>
+            </div>
+
+            <div className="h-80">
+              <RemindersWidget />
             </div>
           </section>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { ProjectInfo, Phase, Resource, RaciTask, CalendarEvent, KanbanTask, KanbanTaskStatus, RaciRoleType } from "./types";
+import { ProjectInfo, Phase, Resource, RaciTask, CalendarEvent, KanbanTask, KanbanTaskStatus, RaciRoleType, ProjectFile, ChecklistItem } from "./types";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
@@ -38,6 +38,15 @@ interface ProjectContextType {
     updateKanbanTaskStatus: (id: string, status: KanbanTaskStatus) => Promise<void>;
     updateKanbanTask: (id: string, updates: Partial<KanbanTask>) => Promise<void>;
     deleteKanbanTask: (id: string) => Promise<void>;
+
+    files: ProjectFile[];
+    addFile: (file: ProjectFile) => void;
+    deleteFile: (id: string) => void;
+
+    checklists: ChecklistItem[];
+    addChecklistItem: (text: string) => void;
+    toggleChecklistItem: (id: string) => void;
+    deleteChecklistItem: (id: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -55,6 +64,17 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const [raciMatrix, setRaciMatrix] = useState<RaciTask[]>([]);
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [kanbanTasks, setKanbanTasks] = useState<KanbanTask[]>([]);
+
+    // Simulated local state for Phase 3 features
+    const [files, setFiles] = useState<ProjectFile[]>([
+        { id: 'f1', name: 'Documento-Requisiti.pdf', size: 1024 * 2500, type: 'application/pdf', uploadDate: new Date().toISOString() },
+        { id: 'f2', name: 'Logo-Azienda.png', size: 1024 * 500, type: 'image/png', uploadDate: new Date().toISOString() }
+    ]);
+    const [checklists, setChecklists] = useState<ChecklistItem[]>([
+        { id: 'c1', text: 'Firmare contratto iniziale', completed: true },
+        { id: 'c2', text: 'Approvazione design mockup', completed: false }
+    ]);
+
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -105,7 +125,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
                         phaseId: k.phase_id,
                         title: k.title,
                         status: k.status,
-                        assigneeId: k.assignee_id || ''
+                        assigneeId: k.assignee_id || '',
+                        startDate: k.start_date || undefined,
+                        endDate: k.end_date || undefined
                     })));
                 }
 
@@ -302,13 +324,16 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
     const addKanbanTask = async (task: Omit<KanbanTask, 'id'>) => {
         const id = `kanban-${Date.now()}`;
-        const payload = {
+        const payload: any = {
             id,
             phase_id: task.phaseId,
             title: task.title,
             status: task.status,
-            assignee_id: task.assigneeId || null
+            assignee_id: task.assigneeId || null,
         };
+        if (task.startDate) payload.start_date = task.startDate;
+        if (task.endDate) payload.end_date = task.endDate;
+
         const { error } = await supabase.from('kanban_tasks').insert(payload);
         if (!error) setKanbanTasks(prev => [...prev, { ...task, id }]);
     };
@@ -323,6 +348,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (updates.title !== undefined) payload.title = updates.title;
         if (updates.status !== undefined) payload.status = updates.status;
         if (updates.assigneeId !== undefined) payload.assignee_id = updates.assigneeId || null;
+        if (updates.startDate !== undefined) payload.start_date = updates.startDate || null;
+        if (updates.endDate !== undefined) payload.end_date = updates.endDate || null;
 
         const { error } = await supabase.from('kanban_tasks').update(payload).eq('id', id);
         if (!error) setKanbanTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
@@ -333,6 +360,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (!error) setKanbanTasks(prev => prev.filter(t => t.id !== id));
     };
 
+    const addFile = (file: ProjectFile) => setFiles(p => [...p, file]);
+    const deleteFile = (id: string) => setFiles(p => p.filter(f => f.id !== id));
+
+    const addChecklistItem = (text: string) => setChecklists(p => [...p, { id: `c-${Date.now()}`, text, completed: false }]);
+    const toggleChecklistItem = (id: string) => setChecklists(p => p.map(c => c.id === id ? { ...c, completed: !c.completed } : c));
+    const deleteChecklistItem = (id: string) => setChecklists(p => p.filter(c => c.id !== id));
+
     return (
         <ProjectContext.Provider value={{
             user, isAdmin, logout,
@@ -342,6 +376,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             raciMatrix, setRaciMatrix, updateRaciTaskRole, addRaciTask, updateRaciTask, deleteRaciTask,
             calendarEvents,
             kanbanTasks, setKanbanTasks, addKanbanTask, updateKanbanTaskStatus, updateKanbanTask, deleteKanbanTask,
+            files, addFile, deleteFile,
+            checklists, addChecklistItem, toggleChecklistItem, deleteChecklistItem,
             isLoading
         }}>
             {children}
