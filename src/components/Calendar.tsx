@@ -23,10 +23,11 @@ export function Calendar() {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const [newTaskPhaseId, setNewTaskPhaseId] = useState("");
     const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("");
+    const [taskStartTime, setTaskStartTime] = useState("09:00");
+    const [taskEndTime, setTaskEndTime] = useState("18:00");
 
-    // Use project start date or current date for initial month view
-    const initialDate = projectInfo.startDate ? new Date(projectInfo.startDate) : new Date("2026-04-01");
-    const [currentDate, setCurrentDate] = useState(initialDate);
+    // Use current date for initial month view so it stays on the current month when refreshing
+    const [currentDate, setCurrentDate] = useState(new Date());
 
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -65,43 +66,51 @@ export function Calendar() {
         setNewTaskTitle("");
         setNewTaskPhaseId("");
         setNewTaskAssigneeId("");
+        setTaskStartTime("09:00");
+        setTaskEndTime("18:00");
         setIsTaskDialogOpen(true);
     };
 
-    const handleCreateTask = () => {
+    const handleCreateTask = async () => {
         if (!selectedDate || !newTaskTitle.trim() || !newTaskPhaseId) return;
 
-        addKanbanTask({
-            title: newTaskTitle.trim(),
-            phaseId: newTaskPhaseId,
-            assigneeId: newTaskAssigneeId || undefined,
-            status: 'Da Fare',
-            startDate: format(selectedDate, "yyyy-MM-dd"),
-            endDate: format(selectedDate, "yyyy-MM-dd"),
-        });
+        const validAssignee = newTaskAssigneeId && newTaskAssigneeId !== "unassigned" ? newTaskAssigneeId : undefined;
 
-        setIsTaskDialogOpen(false);
+        try {
+            await addKanbanTask({
+                title: newTaskTitle.trim(),
+                phaseId: newTaskPhaseId,
+                assigneeId: validAssignee,
+                status: 'Da Fare',
+                startDate: `${format(selectedDate, "yyyy-MM-dd")}T${taskStartTime}:00`,
+                endDate: `${format(selectedDate, "yyyy-MM-dd")}T${taskEndTime}:00`,
+            });
+            setIsTaskDialogOpen(false);
+        } catch (err) {
+            console.error(err);
+            alert("Errore durante la creazione del task.");
+        }
     };
 
     const calendarContent = (
         <Card className={cn("flex flex-col h-full border-border/60 shadow-sm", isExpanded && "border-none shadow-none rounded-none")}>
             <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                     <CardTitle className="text-xl font-bold flex items-center gap-2">
                         <CalendarIcon className="h-5 w-5 text-primary" />
                         Project Calendar
                     </CardTitle>
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => setIsExpanded(!isExpanded)} className="h-8 w-8 mr-2 text-muted-foreground hover:text-foreground">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setIsExpanded(!isExpanded)} className="h-8 w-8 sm:mr-2 text-muted-foreground hover:text-foreground">
                             {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                         </Button>
-                        <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
+                        <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8 shrink-0">
                             <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="font-semibold text-sm w-32 text-center">
+                        <span className="font-semibold text-sm min-w-[110px] text-center shrink-0">
                             {format(currentDate, dateFormat)}
                         </span>
-                        <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
+                        <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8 shrink-0">
                             <ChevronRight className="h-4 w-4" />
                         </Button>
                     </div>
@@ -225,6 +234,26 @@ export function Calendar() {
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="task-start-time">Inizio</Label>
+                                <Input
+                                    id="task-start-time"
+                                    type="time"
+                                    value={taskStartTime}
+                                    onChange={(e) => setTaskStartTime(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="task-end-time">Fine</Label>
+                                <Input
+                                    id="task-end-time"
+                                    type="time"
+                                    value={taskEndTime}
+                                    onChange={(e) => setTaskEndTime(e.target.value)}
+                                />
+                            </div>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="task-assignee">Assignee (Optional)</Label>

@@ -1,7 +1,7 @@
 -- Create files table
 create table public.project_files (
   id uuid default gen_random_uuid() primary key,
-  project_id text references public.project_info(id) on delete cascade not null,
+  project_id uuid references public.project_info(id) on delete cascade not null,
   name text not null,
   size bigint not null,
   type text not null,
