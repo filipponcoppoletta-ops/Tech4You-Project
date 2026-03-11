@@ -2,9 +2,14 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ProjectInfo, Phase, Resource, RaciTask, CalendarEvent, KanbanTask, KanbanTaskStatus, RaciRoleType } from "./types";
-import { supabase } from "./supabase";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 interface ProjectContextType {
+    user: User | null;
+    isAdmin: boolean;
+    logout: () => Promise<void>;
+
     projectInfo: ProjectInfo;
     setProjectInfo: React.Dispatch<React.SetStateAction<ProjectInfo>>;
     phases: Phase[];
@@ -18,7 +23,6 @@ interface ProjectContextType {
     setKanbanTasks: React.Dispatch<React.SetStateAction<KanbanTask[]>>;
     isLoading: boolean;
 
-    // Specific Handlers
     updateProjectInfo: (info: Partial<ProjectInfo>) => Promise<void>;
     addPhase: (phase: Omit<Phase, 'id'>) => Promise<void>;
     updatePhase: (id: string, phase: Partial<Phase>) => Promise<void>;
@@ -30,8 +34,6 @@ interface ProjectContextType {
     addRaciTask: (taskName: string) => Promise<void>;
     updateRaciTask: (id: string, taskName: string) => Promise<void>;
     deleteRaciTask: (id: string) => Promise<void>;
-
-    // Kanban Handlers
     addKanbanTask: (task: Omit<KanbanTask, 'id'>) => Promise<void>;
     updateKanbanTaskStatus: (id: string, status: KanbanTaskStatus) => Promise<void>;
     updateKanbanTask: (id: string, updates: Partial<KanbanTask>) => Promise<void>;
@@ -43,6 +45,10 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const PROJECT_ID = '00000000-0000-0000-0000-000000000001';
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+    const [supabase] = useState(() => createClient());
+    const [user, setUser] = useState<User | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+
     const [projectInfo, setProjectInfo] = useState<ProjectInfo>({ title: 'Loading...', startDate: '2026-01-01', endDate: '2026-12-31', status: 'Pending' });
     const [phases, setPhases] = useState<Phase[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
@@ -51,9 +57,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const [kanbanTasks, setKanbanTasks] = useState<KanbanTask[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Initial Data Fetch
     useEffect(() => {
-        async function fetchAllData() {
+        let isMounted = true;
+
+        async function fetchAllData(currentUser: User) {
             try {
                 const [projectRes, resourcesRes, phasesRes, raciTasksRes, raciRolesRes, kanbanRes] = await Promise.all([
                     supabase.from('project_info').select('*').eq('id', PROJECT_ID).single(),
@@ -64,6 +71,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
                     supabase.from('kanban_tasks').select('*')
                 ]);
 
+                if (!isMounted) return;
+
                 if (projectRes.data) {
                     setProjectInfo({
                         title: projectRes.data.title,
@@ -73,7 +82,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
                     });
                 }
 
-                if (resourcesRes.data) setResources(resourcesRes.data);
+                if (resourcesRes.data) {
+                    setResources(resourcesRes.data);
+                    const me = resourcesRes.data.find(r => r.user_id === currentUser.id);
+                    setIsAdmin(me?.is_admin || false);
+                }
 
                 if (phasesRes.data) {
                     setPhases(phasesRes.data.map(p => ({
@@ -115,13 +128,38 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         }
-        fetchAllData();
-    }, []);
 
-    // Derived Calendar Events from Phases and Project Info
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                setUser(session.user);
+                fetchAllData(session.user);
+            } else {
+                setUser(null);
+                setIsAdmin(false);
+                setIsLoading(false);
+            }
+        });
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                setUser(session.user);
+                fetchAllData(session.user);
+            } else {
+                setUser(null);
+                setIsAdmin(false);
+                setIsLoading(false);
+            }
+        });
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
+    }, [supabase]);
+
     useEffect(() => {
         if (!projectInfo || !projectInfo.startDate) return;
 
@@ -138,7 +176,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         setCalendarEvents(events);
     }, [projectInfo, phases]);
 
-    // Handlers
+    const logout = async () => {
+        await supabase.auth.signOut();
+    };
+
     const updateProjectInfo = async (info: Partial<ProjectInfo>) => {
         const payload: any = {};
         if (info.title !== undefined) payload.title = info.title;
@@ -147,15 +188,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (info.status !== undefined) payload.status = info.status;
 
         const { error } = await supabase.from('project_info').update(payload).eq('id', PROJECT_ID);
-        if (!error) {
-            setProjectInfo(prev => ({ ...prev, ...info }));
-        }
+        if (!error) setProjectInfo(prev => ({ ...prev, ...info }));
     };
 
     const addPhase = async (phase: Omit<Phase, 'id'>) => {
-        const id = `p-${Date.now()}`;
         const payload = {
-            id,
             project_id: PROJECT_ID,
             name: phase.name,
             start_date: phase.startDate,
@@ -163,9 +200,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             progress: phase.progress,
             assignee_id: phase.assigneeId || null
         };
-        const { error } = await supabase.from('phases').insert(payload);
-        if (!error) {
-            setPhases(prev => [...prev, { ...phase, id }]);
+        const { data, error } = await supabase.from('phases').insert(payload).select().single();
+        if (!error && data) {
+            setPhases(prev => [...prev, { ...phase, id: data.id }]);
         }
     };
 
@@ -178,35 +215,31 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (partial.assigneeId !== undefined) payload.assignee_id = partial.assigneeId || null;
 
         const { error } = await supabase.from('phases').update(payload).eq('id', id);
-        if (!error) {
-            setPhases(prev => prev.map(p => p.id === id ? { ...p, ...partial } : p));
-        }
+        if (!error) setPhases(prev => prev.map(p => p.id === id ? { ...p, ...partial } : p));
     };
 
     const deletePhase = async (id: string) => {
         const { error } = await supabase.from('phases').delete().eq('id', id);
-        if (!error) {
-            setPhases(prev => prev.filter(p => p.id !== id));
-        }
+        if (!error) setPhases(prev => prev.filter(p => p.id !== id));
     };
 
     const addResource = async (resource: Resource) => {
-        const { error } = await supabase.from('resources').insert({
+        const payload: any = {
             id: resource.id,
             name: resource.name,
             role: resource.role,
-            email: resource.email
-        });
-        if (!error) {
-            setResources(prev => [...prev, resource]);
-        }
+            email: resource.email,
+        };
+        if (resource.is_admin !== undefined) payload.is_admin = resource.is_admin;
+        if (resource.user_id !== undefined) payload.user_id = resource.user_id;
+
+        const { error } = await supabase.from('resources').insert(payload);
+        if (!error) setResources(prev => [...prev, resource]);
     };
 
     const updateResource = async (id: string, partial: Partial<Resource>) => {
         const { error } = await supabase.from('resources').update(partial).eq('id', id);
-        if (!error) {
-            setResources(prev => prev.map(r => r.id === id ? { ...r, ...partial } : r));
-        }
+        if (!error) setResources(prev => prev.map(r => r.id === id ? { ...r, ...partial } : r));
     };
 
     const deleteResource = async (id: string) => {
@@ -224,18 +257,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const updateRaciTaskRole = async (taskId: string, resourceId: string, role: RaciRoleType) => {
         if (role === null) {
             const { error } = await supabase.from('raci_roles').delete().match({ task_id: taskId, resource_id: resourceId });
-            if (!error) {
-                updateLocalRaciState(taskId, resourceId, null);
-            }
+            if (!error) updateLocalRaciState(taskId, resourceId, null);
         } else {
             const { error } = await supabase.from('raci_roles').upsert({
                 task_id: taskId,
                 resource_id: resourceId,
                 role
             });
-            if (!error) {
-                updateLocalRaciState(taskId, resourceId, role);
-            }
+            if (!error) updateLocalRaciState(taskId, resourceId, role);
         }
     };
 
@@ -243,11 +272,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         setRaciMatrix(prev => prev.map(t => {
             if (t.id === taskId) {
                 const newRoles = { ...t.roles };
-                if (role === null) {
-                    delete newRoles[resourceId];
-                } else {
-                    newRoles[resourceId] = role;
-                }
+                if (role === null) delete newRoles[resourceId];
+                else newRoles[resourceId] = role;
                 return { ...t, roles: newRoles };
             }
             return t;
@@ -261,23 +287,17 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             project_id: PROJECT_ID,
             task_name: taskName
         });
-        if (!error) {
-            setRaciMatrix(prev => [...prev, { id, taskName, roles: {} }]);
-        }
+        if (!error) setRaciMatrix(prev => [...prev, { id, taskName, roles: {} }]);
     };
 
     const updateRaciTask = async (id: string, taskName: string) => {
         const { error } = await supabase.from('raci_tasks').update({ task_name: taskName }).eq('id', id);
-        if (!error) {
-            setRaciMatrix(prev => prev.map(t => t.id === id ? { ...t, taskName } : t));
-        }
+        if (!error) setRaciMatrix(prev => prev.map(t => t.id === id ? { ...t, taskName } : t));
     };
 
     const deleteRaciTask = async (id: string) => {
         const { error } = await supabase.from('raci_tasks').delete().eq('id', id);
-        if (!error) {
-            setRaciMatrix(prev => prev.filter(t => t.id !== id));
-        }
+        if (!error) setRaciMatrix(prev => prev.filter(t => t.id !== id));
     };
 
     const addKanbanTask = async (task: Omit<KanbanTask, 'id'>) => {
@@ -290,16 +310,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             assignee_id: task.assigneeId || null
         };
         const { error } = await supabase.from('kanban_tasks').insert(payload);
-        if (!error) {
-            setKanbanTasks(prev => [...prev, { ...task, id }]);
-        }
+        if (!error) setKanbanTasks(prev => [...prev, { ...task, id }]);
     };
 
     const updateKanbanTaskStatus = async (id: string, status: KanbanTaskStatus) => {
         const { error } = await supabase.from('kanban_tasks').update({ status }).eq('id', id);
-        if (!error) {
-            setKanbanTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-        }
+        if (!error) setKanbanTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
     };
 
     const updateKanbanTask = async (id: string, updates: Partial<KanbanTask>) => {
@@ -309,20 +325,17 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (updates.assigneeId !== undefined) payload.assignee_id = updates.assigneeId || null;
 
         const { error } = await supabase.from('kanban_tasks').update(payload).eq('id', id);
-        if (!error) {
-            setKanbanTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-        }
+        if (!error) setKanbanTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     };
 
     const deleteKanbanTask = async (id: string) => {
         const { error } = await supabase.from('kanban_tasks').delete().eq('id', id);
-        if (!error) {
-            setKanbanTasks(prev => prev.filter(t => t.id !== id));
-        }
+        if (!error) setKanbanTasks(prev => prev.filter(t => t.id !== id));
     };
 
     return (
         <ProjectContext.Provider value={{
+            user, isAdmin, logout,
             projectInfo, setProjectInfo, updateProjectInfo,
             phases, setPhases, addPhase, updatePhase, deletePhase,
             resources, setResources, addResource, updateResource, deleteResource,

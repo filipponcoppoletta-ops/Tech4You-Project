@@ -15,10 +15,12 @@ export interface Phase {
 }
 
 export interface Resource {
-  id: string;
+  id: string; // The UI ID (e.g., 'r1')
   name: string;
   role: string;
   email: string;
+  is_admin?: boolean;
+  user_id?: string; // Supabase Auth UUID
 }
 
 export type RaciRoleType = 'R' | 'A' | 'C' | 'I' | null;

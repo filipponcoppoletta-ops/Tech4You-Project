@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { CalendarEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/ProjectContext";
+import { Link as LinkIcon, Check } from "lucide-react";
 
 export function Calendar() {
     const { projectInfo, phases } = useProject();
@@ -26,6 +27,14 @@ export function Calendar() {
 
     const dateFormat = "MMMM yyyy";
     const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyFeed = () => {
+        const url = `${window.location.origin}/api/calendar`;
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     // Dynamically generate events from project data
     const generatedEvents = useMemo(() => {
@@ -56,16 +65,22 @@ export function Calendar() {
                         <CalendarIcon className="h-5 w-5 text-primary" />
                         Project Calendar
                     </CardTitle>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
-                            <ChevronLeft className="h-4 w-4" />
+                    <div className="flex items-center gap-3">
+                        <Button variant="secondary" size="sm" className="hidden sm:flex" onClick={handleCopyFeed}>
+                            {copied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <LinkIcon className="h-4 w-4 mr-2" />}
+                            {copied ? "Copied!" : "Sync Calendar"}
                         </Button>
-                        <span className="font-semibold text-sm w-32 text-center">
-                            {format(currentDate, dateFormat)}
-                        </span>
-                        <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1 border-l pl-3 ml-1">
+                            <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="font-semibold text-sm w-32 text-center">
+                                {format(currentDate, dateFormat)}
+                            </span>
+                            <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </CardHeader>
@@ -130,6 +145,6 @@ export function Calendar() {
                     })}
                 </div>
             </CardContent>
-        </Card>
+        </Card >
     );
 }

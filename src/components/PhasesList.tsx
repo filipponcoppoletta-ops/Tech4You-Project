@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { PhaseKanban } from "./PhaseKanban";
 
 export function PhasesList() {
-    const { phases, resources, addPhase, updatePhase, deletePhase } = useProject();
+    const { phases, resources, addPhase, updatePhase, deletePhase, isAdmin } = useProject();
 
     const [editingPhase, setEditingPhase] = useState<Phase | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -61,12 +61,14 @@ export function PhasesList() {
                 </h2>
 
                 <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                    <DialogTrigger asChild>
-                        <Button size="sm" className="gap-1.5">
-                            <Plus className="h-4 w-4" />
-                            Add Phase
-                        </Button>
-                    </DialogTrigger>
+                    {isAdmin && (
+                        <DialogTrigger asChild>
+                            <Button size="sm" className="gap-1.5">
+                                <Plus className="h-4 w-4" />
+                                Add Phase
+                            </Button>
+                        </DialogTrigger>
+                    )}
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
                             <DialogTitle>Add New Phase</DialogTitle>
@@ -137,21 +139,23 @@ export function PhasesList() {
                             onClick={() => setSelectedPhase(phase)}
                         >
                             <CardHeader className="pb-3 gap-2 relative">
-                                <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 bg-background/50 backdrop-blur-sm shadow-sm" onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingPhase(phase);
-                                        setIsEditModalOpen(true);
-                                    }}>
-                                        <Edit2 className="h-3 w-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive bg-background/50 backdrop-blur-sm shadow-sm" onClick={(e) => {
-                                        e.stopPropagation();
-                                        deletePhase(phase.id);
-                                    }}>
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
+                                {isAdmin && (
+                                    <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 bg-background/50 backdrop-blur-sm shadow-sm" onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingPhase(phase);
+                                            setIsEditModalOpen(true);
+                                        }}>
+                                            <Edit2 className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive bg-background/50 backdrop-blur-sm shadow-sm" onClick={(e) => {
+                                            e.stopPropagation();
+                                            deletePhase(phase.id);
+                                        }}>
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                )}
 
                                 <div className="flex justify-between items-start pr-16">
                                     <CardTitle className="text-lg font-semibold leading-tight">{phase.name}</CardTitle>
