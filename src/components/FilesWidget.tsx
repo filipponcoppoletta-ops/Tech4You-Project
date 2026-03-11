@@ -19,19 +19,38 @@ export function FilesWidget() {
 
             setIsUploading(true);
 
-            // Simulate network wait
-            setTimeout(() => {
-                addFile({
-                    id: `file-${Date.now()}`,
-                    name: selectedFile.name,
-                    size: selectedFile.size,
-                    type: selectedFile.type,
-                    uploadDate: new Date().toISOString()
-                });
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-            }, 1000);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const contentUrl = event.target?.result as string;
+                // Simulate network wait
+                setTimeout(() => {
+                    addFile({
+                        id: `file-${Date.now()}`,
+                        name: selectedFile.name,
+                        size: selectedFile.size,
+                        type: selectedFile.type,
+                        uploadDate: new Date().toISOString(),
+                        contentUrl
+                    });
+                    setIsUploading(false);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                }, 1000);
+            };
+            reader.readAsDataURL(selectedFile);
         }
+    };
+
+    const handleDownload = (file: { name: string; contentUrl?: string }) => {
+        if (!file.contentUrl) {
+            alert("File content not available for download.");
+            return;
+        }
+        const a = document.createElement("a");
+        a.href = file.contentUrl;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     const formatSize = (bytes: number) => {
@@ -109,7 +128,12 @@ export function FilesWidget() {
                                 </div>
 
                                 <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                        onClick={() => handleDownload(file)}
+                                    >
                                         <Download className="h-3.5 w-3.5" />
                                     </Button>
                                     <Button

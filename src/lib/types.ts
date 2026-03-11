@@ -11,6 +11,7 @@ export interface ProjectFile {
   size: number;
   type: string;
   uploadDate: string;
+  contentUrl?: string;
 }
 
 export interface ChecklistItem {

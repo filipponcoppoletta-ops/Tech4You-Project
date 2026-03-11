@@ -67,8 +67,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
     // Simulated local state for Phase 3 features
     const [files, setFiles] = useState<ProjectFile[]>([
-        { id: 'f1', name: 'Documento-Requisiti.pdf', size: 1024 * 2500, type: 'application/pdf', uploadDate: new Date().toISOString() },
-        { id: 'f2', name: 'Logo-Azienda.png', size: 1024 * 500, type: 'image/png', uploadDate: new Date().toISOString() }
+        { id: 'f1', name: 'Documento-Requisiti.pdf', size: 1024 * 2500, type: 'application/pdf', uploadDate: new Date().toISOString(), contentUrl: 'data:application/pdf;base64,JVBERi0xLjcKCjEgMCBvYmogICUKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iagoKMiAwIG9iaiAlCjw8Ci9UeXBlIC9QYWdlcwovS2lkcyBbMyAwIFJdCi9Db3VudCAxCj4+CmVuZG9iagoKMyAwIG9iaiAlCjw8Ci9UeXBlIC9QYWdlCi9QYXJlbnQgMiAwIFIKL01lZGlhQm94IFswIDAgNTk1LjI4IDg0MS44OV0KL0NvbnRlbnRzIDQgMCBSCj4+CmVuZG9iagoKNCAwIG9iaiAlCjw8Ci9MZW5ndGggMAo+PgpzdHJlYW0KZW5kc3RyZWFtCmVuZG9iagoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNjkgMDAwMDAgbiAKMDAwMDAwMDEyNiAwMDAwMCBuIAowMDAwMDAwMjM0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKMjc0CiUlRU9GCg==' },
+        { id: 'f2', name: 'Logo-Azienda.png', size: 1024 * 500, type: 'image/png', uploadDate: new Date().toISOString(), contentUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' }
     ]);
     const [checklists, setChecklists] = useState<ChecklistItem[]>([
         { id: 'c1', text: 'Firmare contratto iniziale', completed: true },
