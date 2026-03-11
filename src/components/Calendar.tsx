@@ -8,11 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { CalendarEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/ProjectContext";
-import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter, DialogDescription } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 export function Calendar() {
-    const { projectInfo, phases } = useProject();
+    const { projectInfo, phases, resources, addKanbanTask } = useProject();
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // New Task Dialog State
+    const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [newTaskTitle, setNewTaskTitle] = useState("");
+    const [newTaskPhaseId, setNewTaskPhaseId] = useState("");
+    const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("");
 
     // Use project start date or current date for initial month view
     const initialDate = projectInfo.startDate ? new Date(projectInfo.startDate) : new Date("2026-04-01");
@@ -49,6 +59,29 @@ export function Calendar() {
 
         return evts;
     }, [projectInfo, phases]);
+
+    const handleDayClick = (day: Date) => {
+        setSelectedDate(day);
+        setNewTaskTitle("");
+        setNewTaskPhaseId("");
+        setNewTaskAssigneeId("");
+        setIsTaskDialogOpen(true);
+    };
+
+    const handleCreateTask = () => {
+        if (!selectedDate || !newTaskTitle.trim() || !newTaskPhaseId) return;
+
+        addKanbanTask({
+            title: newTaskTitle.trim(),
+            phaseId: newTaskPhaseId,
+            assigneeId: newTaskAssigneeId || undefined,
+            status: 'Da Fare',
+            startDate: format(selectedDate, "yyyy-MM-dd"),
+            endDate: format(selectedDate, "yyyy-MM-dd"),
+        });
+
+        setIsTaskDialogOpen(false);
+    };
 
     const calendarContent = (
         <Card className={cn("flex flex-col h-full border-border/60 shadow-sm", isExpanded && "border-none shadow-none rounded-none")}>
@@ -95,12 +128,13 @@ export function Calendar() {
                         return (
                             <div
                                 key={day.toString()}
+                                onClick={() => handleDayClick(day)}
                                 className={cn(
-                                    "p-1 border rounded-md flex flex-col transition-colors overflow-hidden",
+                                    "p-1 border rounded-md flex flex-col transition-colors overflow-hidden cursor-pointer hover:border-primary/50 group",
                                     !isExpanded && "min-h-[80px]",
-                                    !isCurrentMonth ? "bg-secondary/20 text-muted-foreground border-transparent" : "bg-card border-border/50",
+                                    !isCurrentMonth ? "bg-secondary/20 text-muted-foreground border-transparent" : "bg-card border-border/50 hover:bg-muted/30",
                                     isDayToday && "border-primary ring-1 ring-primary/20",
-                                    dayEvents.length > 0 && "cursor-pointer hover:bg-muted/50"
+                                    dayEvents.length > 0 && "hover:bg-muted/50"
                                 )}
                             >
                                 <div className="flex justify-between items-start">
@@ -160,6 +194,66 @@ export function Calendar() {
     return (
         <>
             {calendarContent}
+
+            <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Create New Task</DialogTitle>
+                        <DialogDescription>
+                            Add a task for {selectedDate ? format(selectedDate, "MMMM d, yyyy") : ""}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="task-title">Task Title</Label>
+                            <Input
+                                id="task-title"
+                                placeholder="E.g. Review documentation"
+                                value={newTaskTitle}
+                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="task-phase">Project Phase</Label>
+                            <Select value={newTaskPhaseId} onValueChange={setNewTaskPhaseId}>
+                                <SelectTrigger id="task-phase">
+                                    <SelectValue placeholder="Select phase..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {phases.map(phase => (
+                                        <SelectItem key={phase.id} value={phase.id}>{phase.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="task-assignee">Assignee (Optional)</Label>
+                            <Select value={newTaskAssigneeId} onValueChange={setNewTaskAssigneeId}>
+                                <SelectTrigger id="task-assignee">
+                                    <SelectValue placeholder="Select team member..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                    {resources.map(res => (
+                                        <SelectItem key={res.id} value={res.id}>
+                                            {res.name} <span className="text-muted-foreground text-xs ml-1">({res.role})</span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleCreateTask}
+                            disabled={!newTaskTitle.trim() || !newTaskPhaseId}
+                        >
+                            Create Task
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
