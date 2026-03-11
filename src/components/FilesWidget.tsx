@@ -12,45 +12,45 @@ export function FilesWidget() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
 
-    // A very basic simulated upload that just takes the file info and saves it in local context
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const selectedFile = e.target.files[0];
-
             setIsUploading(true);
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const contentUrl = event.target?.result as string;
-                // Simulate network wait
-                setTimeout(() => {
-                    addFile({
-                        id: `file-${Date.now()}`,
-                        name: selectedFile.name,
-                        size: selectedFile.size,
-                        type: selectedFile.type,
-                        uploadDate: new Date().toISOString(),
-                        contentUrl
-                    });
-                    setIsUploading(false);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                }, 1000);
-            };
-            reader.readAsDataURL(selectedFile);
+            try {
+                await addFile(selectedFile);
+            } catch (error) {
+                console.error("Failed to upload file:", error);
+                alert("Failed to upload file. Please try again.");
+            } finally {
+                setIsUploading(false);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+            }
         }
     };
 
-    const handleDownload = (file: { name: string; contentUrl?: string }) => {
-        if (!file.contentUrl) {
-            alert("File content not available for download.");
+    const handleDownload = async (file: { name: string; storagePath?: string }) => {
+        if (!file.storagePath) {
+            alert("File path not available for download.");
             return;
         }
-        const a = document.createElement("a");
-        a.href = file.contentUrl;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+
+        const { data } = supabase.storage.from('documents').getPublicUrl(file.storagePath);
+
+        if (data && data.publicUrl) {
+            const a = document.createElement("a");
+            a.href = data.publicUrl;
+            a.target = "_blank";
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } else {
+            alert("Could not generate download link.");
+        }
     };
 
     const formatSize = (bytes: number) => {

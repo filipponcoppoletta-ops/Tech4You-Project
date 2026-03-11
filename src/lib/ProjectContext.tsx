@@ -40,8 +40,8 @@ interface ProjectContextType {
     deleteKanbanTask: (id: string) => Promise<void>;
 
     files: ProjectFile[];
-    addFile: (file: ProjectFile) => void;
-    deleteFile: (id: string) => void;
+    addFile: (file: File) => Promise<void>;
+    deleteFile: (id: string) => Promise<void>;
 
     checklists: ChecklistItem[];
     addChecklistItem: (text: string) => void;
@@ -66,10 +66,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const [kanbanTasks, setKanbanTasks] = useState<KanbanTask[]>([]);
 
     // Simulated local state for Phase 3 features
-    const [files, setFiles] = useState<ProjectFile[]>([
-        { id: 'f1', name: 'Documento-Requisiti.pdf', size: 1024 * 2500, type: 'application/pdf', uploadDate: new Date().toISOString(), contentUrl: 'data:application/pdf;base64,JVBERi0xLjcKCjEgMCBvYmogICUKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iagoKMiAwIG9iaiAlCjw8Ci9UeXBlIC9QYWdlcwovS2lkcyBbMyAwIFJdCi9Db3VudCAxCj4+CmVuZG9iagoKMyAwIG9iaiAlCjw8Ci9UeXBlIC9QYWdlCi9QYXJlbnQgMiAwIFIKL01lZGlhQm94IFswIDAgNTk1LjI4IDg0MS44OV0KL0NvbnRlbnRzIDQgMCBSCj4+CmVuZG9iagoKNCAwIG9iaiAlCjw8Ci9MZW5ndGggMAo+PgpzdHJlYW0KZW5kc3RyZWFtCmVuZG9iagoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNjkgMDAwMDAgbiAKMDAwMDAwMDEyNiAwMDAwMCBuIAowMDAwMDAwMjM0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKMjc0CiUlRU9GCg==' },
-        { id: 'f2', name: 'Logo-Azienda.png', size: 1024 * 500, type: 'image/png', uploadDate: new Date().toISOString(), contentUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' }
-    ]);
+    const [files, setFiles] = useState<ProjectFile[]>([]);
     const [checklists, setChecklists] = useState<ChecklistItem[]>([
         { id: 'c1', text: 'Firmare contratto iniziale', completed: true },
         { id: 'c2', text: 'Approvazione design mockup', completed: false }
@@ -82,13 +79,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
         async function fetchAllData(currentUser: User) {
             try {
-                const [projectRes, resourcesRes, phasesRes, raciTasksRes, raciRolesRes, kanbanRes] = await Promise.all([
+                const [projectRes, resourcesRes, phasesRes, raciTasksRes, raciRolesRes, kanbanRes, filesRes] = await Promise.all([
                     supabase.from('project_info').select('*').eq('id', PROJECT_ID).single(),
                     supabase.from('resources').select('*'),
                     supabase.from('phases').select('*').eq('project_id', PROJECT_ID).order('start_date', { ascending: true }),
                     supabase.from('raci_tasks').select('*').eq('project_id', PROJECT_ID),
                     supabase.from('raci_roles').select('*'),
-                    supabase.from('kanban_tasks').select('*')
+                    supabase.from('kanban_tasks').select('*'),
+                    supabase.from('project_files').select('*').eq('project_id', PROJECT_ID).order('upload_date', { ascending: false })
                 ]);
 
                 if (!isMounted) return;
@@ -125,9 +123,20 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
                         phaseId: k.phase_id,
                         title: k.title,
                         status: k.status,
-                        assigneeId: k.assignee_id || '',
+                        assigneeId: k.assignee_id || undefined,
                         startDate: k.start_date || undefined,
                         endDate: k.end_date || undefined
+                    })));
+                }
+
+                if (filesRes.data) {
+                    setFiles(filesRes.data.map((f: { id: string; name: string; size: number; type: string; upload_date: string; storage_path: string }) => ({
+                        id: f.id,
+                        name: f.name,
+                        size: f.size,
+                        type: f.type,
+                        uploadDate: f.upload_date,
+                        storagePath: f.storage_path
                     })));
                 }
 
@@ -360,8 +369,64 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (!error) setKanbanTasks(prev => prev.filter(t => t.id !== id));
     };
 
-    const addFile = (file: ProjectFile) => setFiles(p => [...p, file]);
-    const deleteFile = (id: string) => setFiles(p => p.filter(f => f.id !== id));
+    const addFile = async (file: File) => {
+        // 1. Upload to Storage
+        const filePath = `${PROJECT_ID}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+        const { data: storageData, error: storageError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+        if (storageError) {
+            console.error("Storage upload error:", storageError);
+            throw storageError;
+        }
+
+        // 2. Insert into Database
+        const { data: dbData, error: dbError } = await supabase.from('project_files').insert({
+            project_id: PROJECT_ID,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            storage_path: storageData.path
+        }).select().single();
+
+        if (dbError) {
+            // Attempt rollback
+            await supabase.storage.from('documents').remove([storageData.path]);
+            console.error("Database insert error:", dbError);
+            throw dbError;
+        }
+
+        // 3. Update local state
+        if (dbData) {
+            setFiles(prev => [{
+                id: dbData.id,
+                name: dbData.name,
+                size: dbData.size,
+                type: dbData.type,
+                storagePath: dbData.storage_path,
+                uploadDate: dbData.upload_date
+            }, ...prev]);
+        }
+    };
+
+    const deleteFile = async (id: string) => {
+        const fileToDelete = files.find(f => f.id === id);
+        if (!fileToDelete) return;
+
+        // 1. Delete from storage
+        if (fileToDelete.storagePath) {
+            await supabase.storage.from('documents').remove([fileToDelete.storagePath]);
+        }
+
+        // 2. Delete from DB
+        const { error } = await supabase.from('project_files').delete().eq('id', id);
+
+        if (!error) {
+            setFiles(prev => prev.filter(f => f.id !== id));
+        }
+    };
 
     const addChecklistItem = (text: string) => setChecklists(p => [...p, { id: `c-${Date.now()}`, text, completed: false }]);
     const toggleChecklistItem = (id: string) => setChecklists(p => p.map(c => c.id === id ? { ...c, completed: !c.completed } : c));

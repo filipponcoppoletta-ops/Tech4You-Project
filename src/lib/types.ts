@@ -11,7 +11,7 @@ export interface ProjectFile {
   size: number;
   type: string;
   uploadDate: string;
-  contentUrl?: string;
+  storagePath: string; // the path in Supabase Storage bucket
 }
 
 export interface ChecklistItem {
