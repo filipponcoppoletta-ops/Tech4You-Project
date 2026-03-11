@@ -63,7 +63,7 @@ export function ChecklistsWidget() {
                     <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                         <ListTodo className="h-10 w-10 text-muted-foreground mb-3 opacity-30" />
                         <h3 className="font-semibold text-foreground">No tasks yet</h3>
-                        <p className="text-sm mt-1 max-w-xs">Create checklists to stay on top of the project's minor tasks.</p>
+                        <p className="text-sm mt-1 max-w-xs">Create checklists to stay on top of the project&apos;s minor tasks.</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-border/50">

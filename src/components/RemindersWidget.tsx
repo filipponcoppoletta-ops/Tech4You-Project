@@ -8,10 +8,16 @@ import { useProject } from "@/lib/ProjectContext";
 import { differenceInDays, parseISO, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Checkbox } from "./ui/checkbox";
+import { Label } from "./ui/label";
+
 export function RemindersWidget() {
     const { phases, resources } = useProject();
     const [isSending, setIsSending] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+    const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
 
     // Identify upcoming or overdue items
     const today = new Date();
@@ -33,18 +39,48 @@ export function RemindersWidget() {
         .filter(r => r.daysRef <= 7) // Due within 7 days or overdue
         .sort((a, b) => a.daysRef - b.daysRef);
 
+    const openEmailDialog = () => {
+        // Pre-select all resources with emails
+        const allEmails = resources.filter(r => r.email).map(r => r.email);
+        setSelectedRecipients(allEmails);
+        setIsEmailDialogOpen(true);
+    };
+
+    const toggleRecipient = (email: string) => {
+        if (selectedRecipients.includes(email)) {
+            setSelectedRecipients(prev => prev.filter(e => e !== email));
+        } else {
+            setSelectedRecipients(prev => [...prev, email]);
+        }
+    };
+
     const handleSendReminder = () => {
         setIsSending(true);
-        // Simulate API call
+
+        // Generate mailto link
+        const to = selectedRecipients.join(',');
+        const subject = encodeURIComponent(`Aggiornamenti Scadenze Progetto Tech4You`);
+
+        let bodyText = `Ciao Team,\n\nEcco un riepilogo delle scadenze imminenti o scadute:\n\n`;
+        reminders.forEach(r => {
+            const assigneeName = resources.find(res => res.id === r.assigneeId)?.name || 'Nessun assegnatario';
+            const statusText = r.isOverdue ? "SCADUTO" : `In scadenza tra ${r.daysRef} giorni`;
+            bodyText += `- ${r.name} (${statusText})\n  Scadenza: ${r.date}\n  Assegnato a: ${assigneeName}\n\n`;
+        });
+        bodyText += `Per favore, verificate lo stato di queste attività.\n\nGrazie!`;
+
+        const body = encodeURIComponent(bodyText);
+        const mailtoLink = `mailto:${to}?subject=${subject}&body=${body}`;
+
+        // Open default mail client
+        window.open(mailtoLink, '_self');
+
         setTimeout(() => {
             setIsSending(false);
-            setToastMessage("Notifiche email inviate con successo a tutto il team!");
-
-            // Auto-hide toast after 4 seconds
-            setTimeout(() => {
-                setToastMessage(null);
-            }, 4000);
-        }, 1500);
+            setIsEmailDialogOpen(false);
+            setToastMessage("Client email aperto e pronto per l'invio!");
+            setTimeout(() => setToastMessage(null), 4000);
+        }, 500);
     };
 
     return (
@@ -64,7 +100,7 @@ export function RemindersWidget() {
                         size="sm"
                         variant="default"
                         disabled={reminders.length === 0 || isSending}
-                        onClick={handleSendReminder}
+                        onClick={openEmailDialog}
                         className="flex items-center gap-1.5"
                     >
                         {isSending ? (
@@ -122,6 +158,54 @@ export function RemindersWidget() {
                     </div>
                 )}
             </CardContent>
+
+            <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Invia Alert Scadenze</DialogTitle>
+                        <DialogDescription>
+                            Seleziona i membri del team a cui inviare &apos;{reminders.length}&apos; avvisi via email. Verrà aperto il tuo client di posta.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4 space-y-4">
+                        {resources.filter(r => r.email).length === 0 ? (
+                            <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md shrink-0">
+                                Nessun membro del team ha un indirizzo email configurato in Risorse.
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-2">
+                                {resources.filter(r => r.email).map(resource => (
+                                    <div key={resource.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`recipient-${resource.id}`}
+                                            checked={selectedRecipients.includes(resource.email)}
+                                            onCheckedChange={() => toggleRecipient(resource.email)}
+                                            className="shrink-0"
+                                        />
+                                        <div className="grid gap-1.5 leading-none">
+                                            <Label htmlFor={`recipient-${resource.id}`} className="font-medium cursor-pointer">
+                                                {resource.name} <span className="text-xs text-muted-foreground ml-1">({resource.role})</span>
+                                            </Label>
+                                            <p className="text-sm text-muted-foreground">{resource.email}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>Annulla</Button>
+                        <Button
+                            onClick={handleSendReminder}
+                            disabled={selectedRecipients.length === 0}
+                        >
+                            Componi Email
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

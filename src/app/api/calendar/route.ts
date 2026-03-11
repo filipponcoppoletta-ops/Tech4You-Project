@@ -12,7 +12,7 @@ function formatICalDate(dateStr: string, isEndOfDay = false) {
     return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-function generateICalContent(projectInfo: any, phases: any[]) {
+function generateICalContent(projectInfo: Record<string, string | null>, phases: Record<string, string>[]) {
     const events: string[] = [];
     const now = formatICalDate(new Date().toISOString());
 
@@ -106,8 +106,8 @@ export async function GET() {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
             },
         });
-    } catch (error) {
-        console.error('Calendar generation error:', error);
+    } catch (e: unknown) {
+        console.error("Failed to generate ICS:", e);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }

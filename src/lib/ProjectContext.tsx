@@ -212,7 +212,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateProjectInfo = async (info: Partial<ProjectInfo>) => {
-        const payload: any = {};
+        const payload: Record<string, unknown> = {};
         if (info.title !== undefined) payload.title = info.title;
         if (info.startDate !== undefined) payload.start_date = info.startDate;
         if (info.endDate !== undefined) payload.end_date = info.endDate;
@@ -238,7 +238,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updatePhase = async (id: string, partial: Partial<Phase>) => {
-        const payload: any = {};
+        const payload: Record<string, unknown> = {};
         if (partial.name !== undefined) payload.name = partial.name;
         if (partial.startDate !== undefined) payload.start_date = partial.startDate;
         if (partial.endDate !== undefined) payload.end_date = partial.endDate;
@@ -255,7 +255,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     };
 
     const addResource = async (resource: Resource) => {
-        const payload: any = {
+        const payload: Record<string, unknown> = {
             id: resource.id,
             name: resource.name,
             role: resource.role,
@@ -332,9 +332,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     };
 
     const addKanbanTask = async (task: Omit<KanbanTask, 'id'>) => {
-        const id = `kanban-${Date.now()}`;
-        const payload: any = {
-            id,
+        // We do not provide 'id' so Supabase can generate it (uuid or otherwise)
+        const payload: Record<string, unknown> = {
             phase_id: task.phaseId,
             title: task.title,
             status: task.status,
@@ -343,8 +342,15 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         if (task.startDate) payload.start_date = task.startDate;
         if (task.endDate) payload.end_date = task.endDate;
 
-        const { error } = await supabase.from('kanban_tasks').insert(payload);
-        if (!error) setKanbanTasks(prev => [...prev, { ...task, id }]);
+        // Perform insert and select the inserted row to get its real ID
+        const { data, error } = await supabase.from('kanban_tasks').insert(payload).select().single();
+        if (!error && data) {
+            setKanbanTasks(prev => [...prev, { ...task, id: data.id }]);
+        } else {
+            console.error("Error creating Kanban task:", error);
+            // Fallback for UI if db fails (but ideally should throw or handle properly)
+            throw error;
+        }
     };
 
     const updateKanbanTaskStatus = async (id: string, status: KanbanTaskStatus) => {
@@ -353,7 +359,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateKanbanTask = async (id: string, updates: Partial<KanbanTask>) => {
-        const payload: any = {};
+        const payload: Record<string, unknown> = {};
         if (updates.title !== undefined) payload.title = updates.title;
         if (updates.status !== undefined) payload.status = updates.status;
         if (updates.assigneeId !== undefined) payload.assignee_id = updates.assigneeId || null;

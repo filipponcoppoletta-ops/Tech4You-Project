@@ -14,7 +14,7 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 export function Calendar() {
-    const { projectInfo, phases, resources, addKanbanTask } = useProject();
+    const { projectInfo, phases, resources, kanbanTasks, addKanbanTask } = useProject();
     const [isExpanded, setIsExpanded] = useState(false);
 
     // New Task Dialog State
@@ -58,8 +58,16 @@ export function Calendar() {
             evts.push({ id: `phase-end-${p.id}`, title: `End: ${p.name}`, date: p.endDate, type: 'Deadline' });
         });
 
+        // Kanban Tasks
+        kanbanTasks.forEach(t => {
+            if (t.startDate) {
+                // If the task has a specific time, it will be included in the date string (e.g., 'YYYY-MM-DDTHH:mm')
+                evts.push({ id: t.id, title: t.title, date: t.startDate, type: 'Meeting' });
+            }
+        });
+
         return evts;
-    }, [projectInfo, phases]);
+    }, [projectInfo, phases, kanbanTasks]);
 
     const handleDayClick = (day: Date) => {
         setSelectedDate(day);
