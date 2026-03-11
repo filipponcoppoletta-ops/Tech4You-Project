@@ -38,7 +38,6 @@ export function PhasesList() {
     const handleAddSave = () => {
         if (!newPhaseData.name || !newPhaseData.startDate || !newPhaseData.endDate) return;
         addPhase({
-            id: `p - ${Date.now()} `,
             name: newPhaseData.name,
             startDate: newPhaseData.startDate,
             endDate: newPhaseData.endDate,
